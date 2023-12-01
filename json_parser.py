@@ -43,32 +43,30 @@ def parse_query(query, data):
     
     if "ONDE" in query_words:
         where_index = query_words.index("ONDE")
-        
-        # column, condition and value
-        where_column = query_words[where_index + 1]
-        where_condition = query_words[where_index + 2]
-        value = query_words[where_index + 3]
+        conditions = []
 
-        # two conditions
-        logical_operator = None
-        if "OU" in query_words:
-            logical_operator = "OU"
-        elif "E" in query_words:
-            logical_operator = "E"
+        i = where_index + 1
+        while i < len(query_words):
+            if query_words[i] in ["E", "OU"]:
+                logical_operator = query_words[i]
+                i += 1
+            else:
+                logical_operator = None
 
-        if logical_operator:
-            logical_index = query_words.index(logical_operator)
+            column = query_words[i]
+            condition = query_words[i + 1]
+            value = query_words[i + 2]
 
-            # column, condition and value of second condition
-            where_column2 = query_words[logical_index + 1]
-            where_condition2 = query_words[logical_index + 2]
-            value2 = query_words[logical_index + 3]
+            if logical_operator:
+                conditions.append(logical_operator)
 
-            result = _and_or(from_data, where_column, where_condition, value, logical_operator, where_column2, where_condition2, value2)
-        else:
-            result = _where(from_data, where_column, where_condition, value)
+            conditions.append((column, condition, value))
+
+            i += 3
+
+        result = _where(from_data, conditions)
     else:
-        result = from_data  # Se não houver cláusula ONDE, o resultado é a tabela selecionada
+        result = from_data
 
     # Verificar se há cláusula ORDER BY
     if "ORDENE" in query_words:
@@ -118,51 +116,72 @@ def _from(select_columns, table):
         print(f"Erro: Falha ao decodificar o JSON no arquivo '{table}'.")
         return None
 
-def _where(data, column, condition, value):
-    # Converta o valor para float se possível
+def _where(data, conditions):
+    filtered_data = []
+
+    i = 0
+    tuple_count = 0
+    tuples = []
+    logical_op_count = 0
+    logicals = []
+    or_count = 1 # primeira condição
+    and_count = 0
+
+    while i < len(conditions):
+        if isinstance(conditions[i], tuple):
+            tuple_count += 1
+            tuples.append(conditions[i])
+        else:
+            logical_op_count += 1
+            logicals.append(conditions[i])
+            if conditions[i] == "OU":
+                or_count += 1
+            else:
+                and_count += 1
+        i += 1
+
+    # OU aparece antes do E
+    logicals.sort(reverse=True)
+
+    i = 0
+    while i < tuple_count:
+        column = tuples[i][0]
+        condition = tuples[i][1]
+        value = tuples[i][2]
+
+        if or_count > 0: # acumula os dados
+            filtered_data += _apply_condition(data, column, condition, value)
+            or_count -= 1
+        elif and_count > 0: # restringe
+            filtered_data = _apply_condition(filtered_data, column, condition, value)
+            and_count -= 1
+
+        i += 1
+
+    return filtered_data
+
+def _apply_condition(data, column, condition, value):
+    # Convert value to float if possible
     try:
         value = float(value)
     except (ValueError, TypeError):
         pass
 
-    if condition == "=":
-        return [entry for entry in data if entry.get(column) == value]
-    elif condition == "<":
-        return [entry for entry in data if entry.get(column) < value]
-    elif condition == "<=":
-        return [entry for entry in data if entry.get(column) <= value]
-    elif condition == ">":
-        return [entry for entry in data if entry.get(column) > value]
-    elif condition == ">=":
-        return [entry for entry in data if entry.get(column) >= value]
+    if condition == '=':
+        return [row for row in data if row.get(column) == value]
+    elif condition == '<':
+        return [row for row in data if row.get(column) < value]
+    elif condition == '<=':
+        return [row for row in data if row.get(column) <= value]
+    elif condition == '>':
+        return [row for row in data if row.get(column) > value]
+    elif condition == '>=':
+        return [row for row in data if row.get(column) >= value]
     else:
-        print(f"Erro: Condição '{condition}' não suportada em _where.")
+        print(f"Erro: Operador de comparação '{condition}' não suportado.")
         return data
 
-def _and_or(data, column1, condition1, value1, logical_operator, column2, condition2, value2):
-    # Converta os valores para float se possível
-    try:
-        value1 = float(value1)
-    except (ValueError, TypeError):
-        pass
-
-    try:
-        value2 = float(value2)
-    except (ValueError, TypeError):
-        pass
-
-    if logical_operator == "OU":
-        data_condition1 = _where(data, column1, condition1, value1)
-        data_condition2 = _where(data, column2, condition2, value2)
-        return data_condition1 + data_condition2
-    elif logical_operator == "E":
-        data_condition1 = _where(data, column1, condition1, value1)
-        return _where(data_condition1, column2, condition2, value2)
-    else:
-        print(f"Erro: Operador lógico '{logical_operator}' não suportado.")
-        return data
-
-json_query = "PEGAR * DE hurricanes ORDENE Average CRESCENTE"
+json_query = "PEGAR Month, Average DE hurricanes ONDE Average >= 0.1 E Average < 2 ORDENE Average DECRESCENTE"
 data = load_data()
 result = parse_query(json_query, data)
 print(result)
