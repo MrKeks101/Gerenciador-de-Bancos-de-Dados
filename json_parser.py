@@ -28,7 +28,11 @@ def parse_query(query, data):
     if "PEGAR" in query_words and "DE" in query_words:
         select_index = query_words.index("PEGAR")
         from_index = query_words.index("DE")
-        select_columns = [col for col in query_words[select_index + 1:from_index]]
+        
+        if select_index < from_index - 1:
+            select_columns = [col for col in query_words[select_index + 1:from_index]]
+        else:
+            select_columns = ["*"]
     
     if "DE" in query_words:
         from_index = query_words.index("DE")
@@ -99,6 +103,10 @@ def _from(select_columns, table):
                     except (ValueError, TypeError):
                         pass
             
+            if "*" in select_columns:
+                # Se "*" estiver presente, selecione todas as colunas disponíveis
+                return table_data
+
             # Selecione apenas as colunas desejadas
             selected_data = [{col: row.get(col) for col in select_columns} for row in table_data]
             
@@ -154,7 +162,7 @@ def _and_or(data, column1, condition1, value1, logical_operator, column2, condit
         print(f"Erro: Operador lógico '{logical_operator}' não suportado.")
         return data
 
-json_query = "PEGAR Month, Average DE hurricanes ONDE Month = May OU Average > 2 ORDENE Average DECRESCENTE"
+json_query = "PEGAR * DE hurricanes ORDENE Average CRESCENTE"
 data = load_data()
 result = parse_query(json_query, data)
 print(result)
