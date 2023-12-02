@@ -33,6 +33,38 @@ def parse_query(query, data):
             select_columns = [col for col in query_words[select_index + 1:from_index]]
         else:
             select_columns = ["*"]
+            
+    elif "INSERIR" in query_words and "EM" in query_words:
+        #print("INSERIR EM tabela (campo1, campo2, ....) VALORES (valor1, valor2, ...)")
+        insert_index = query_words.index("INSERIR")
+        into_index = query_words.index("EM")
+
+        insert_values_index = into_index + 1
+        into_table = query_words[into_index + 1]
+
+        if "VALORES" in query_words:
+            values_index = query_words.index("VALORES")
+            columns = query_words[(insert_values_index + 1):values_index]
+            values = query_words[values_index + 1:]
+
+            # remove os parenteses da statement
+            columns_clean = [s.replace('(', '').replace(')', '') for s in columns]
+            values_clean = [s.replace('(', '').replace(')', '') for s in values]
+
+            # insere
+            _insert_into(into_table, columns_clean, values_clean)
+
+            # retorna o registro inserido
+            return (columns_clean, values_clean)
+        else:
+            raise ValueError("Cláusula 'VALORES' não encontrada na instrução INSERIR.")
+
+    elif "ATUALIZAR" in query_words and "DEFINIR" in query_words:
+        print("ATUALIZAR tabela DEFINIR campo1 = valor1, campo2 = valor2 ONDE condicao")
+    elif "APAGAR" in query_words and "DE" in query_words:
+        print("APAGAR DE tabela ONDE condicao")
+    else:
+        raise ValueError("Statement não reconhecida")
     
     if "DE" in query_words:
         from_index = query_words.index("DE")
@@ -181,7 +213,29 @@ def _apply_condition(data, column, condition, value):
         print(f"Erro: Operador de comparação '{condition}' não suportado.")
         return data
 
-json_query = "PEGAR Month, Average DE hurricanes ONDE Average >= 0.1 E Average < 2 ORDENE Average DECRESCENTE"
+def _insert_into(table, columns, values):
+    try:
+        with open(os.path.join(data_directory, f"{table}.json"), 'r') as json_file:
+            table_data = json.load(json_file).get(table, [])
+
+            # Criar um novo registro
+            new_record = {}
+            for col, val in zip(columns, values):
+                new_record[col] = val
+
+            # Adicionar o novo registro aos dados existentes
+            table_data.append(new_record)
+
+            # Escrever os dados atualizados de volta ao arquivo JSON
+            with open(os.path.join(data_directory, f"{table}.json"), 'w') as json_file:
+                json.dump({table: table_data}, json_file, indent=2)
+
+    except FileNotFoundError:
+        print(f"Erro: O arquivo JSON '{table}' não foi encontrado.")
+    except json.JSONDecodeError:
+        print(f"Erro: Falha ao decodificar o JSON no arquivo '{table}'.")
+
+json_query = "INSERIR EM homes (Sell, List, Living, Rooms) VALORES (TESTE, TESTE, TESTE, TESTE)"
 data = load_data()
 result = parse_query(json_query, data)
 print(result)
