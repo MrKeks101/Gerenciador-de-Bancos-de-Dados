@@ -106,7 +106,37 @@ def parse_query(query, data):
         return "Dados atualizados!"
 
     elif "APAGAR" in query_words and "DE" in query_words:
-        print("APAGAR DE tabela ONDE condicao")
+        #print("APAGAR DE tabela ONDE condicao")
+        delete_index = query_words.index("APAGAR")
+        from_index = query_words.index("DE")
+        where_index = query_words.index("ONDE")
+
+        delete_table = query_words[delete_index + 2]
+        conditions = []
+
+        i = where_index + 1
+        while i < len(query_words):
+            if query_words[i] in ["E", "OU"]:
+                logical_operator = query_words[i]
+                i += 1
+            else:
+                logical_operator = None
+
+            column = query_words[i]
+            condition = query_words[i + 1]
+            value = query_words[i + 2]
+
+            if logical_operator:
+                conditions.append(logical_operator)
+
+            conditions.append((column, condition, value))
+
+            i += 3
+
+        # Chamar a função para apagar os dados
+        _delete_from(delete_table, conditions)
+
+        return f"Registros apagados da tabela '{delete_table}'."
     else:
         raise ValueError("Statement não reconhecida")
 
@@ -328,9 +358,27 @@ def _compare_values(data_value, operator, condition_value):
         print(f"Erro: Operador de comparação '{operator}' não suportado.")
         return False
 
+def _delete_from(table, conditions):
+    try:
+        with open(os.path.join(data_directory, f"{table}.json"), 'r') as json_file:
+            table_data = json.load(json_file).get(table, [])
+
+            # Filtrar os dados que NÃO atendem às condições
+            filtered_data = [row for row in table_data if not _check_conditions(row, conditions)]
+
+            # Escrever os dados filtrados de volta ao arquivo JSON
+            with open(os.path.join(data_directory, f"{table}.json"), 'w') as json_file:
+                json.dump({table: filtered_data}, json_file, indent=2)
+
+    except FileNotFoundError:
+        print(f"Erro: O arquivo JSON '{table}' não foi encontrado.")
+    except json.JSONDecodeError:
+        print(f"Erro: Falha ao decodificar o JSON no arquivo '{table}'.")
+
 #json_query = "PEGAR Month, Average DE hurricanes ONDE Average >= 0.1 E Average < 2 ORDENE Average DECRESCENTE"
 #json_query = "INSERIR EM homes (Sell, List, Living, Rooms) VALORES (TESTE, TESTE, TESTE, TESTE)"
-json_query = "ATUALIZAR hurricanes DEFINIR Month = January, Average = 1.1 ONDE Average < 3.0"
+#json_query = "ATUALIZAR hurricanes DEFINIR Month = January, Average = 1.1 ONDE Average > 3.0"
+json_query = "APAGAR DE hurricanes ONDE Month = March"
 data = load_data()
 result = parse_query(json_query, data)
 print(result)
