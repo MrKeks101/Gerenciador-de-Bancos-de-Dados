@@ -60,12 +60,56 @@ def parse_query(query, data):
             raise ValueError("Cláusula 'VALORES' não encontrada na instrução INSERIR.")
 
     elif "ATUALIZAR" in query_words and "DEFINIR" in query_words:
-        print("ATUALIZAR tabela DEFINIR campo1 = valor1, campo2 = valor2 ONDE condicao")
+        #print("ATUALIZAR tabela DEFINIR campo1 = valor1, campo2 = valor2 ONDE condicao")
+        update_index = query_words.index("ATUALIZAR")
+        set_index = query_words.index("DEFINIR")
+        where_index = query_words.index("ONDE")
+
+        update_table = query_words[update_index + 1]
+        columns = query_words[set_index + 1:where_index]
+
+        # Inicializar conjuntos para colunas e valores
+        colunas = []
+        valores = []
+
+        # Iterar pelos dados de 3 em 3 elementos
+        for i in range(0, len(columns), 3):
+            coluna = columns[i]
+            valor = columns[i + 2]
+
+            colunas.append(coluna)
+            valores.append(valor)
+        
+        conditions = []
+        i = where_index + 1
+        while i < len(query_words):
+            if query_words[i] in ["E", "OU"]:
+                logical_operator = query_words[i]
+                i += 1
+            else:
+                logical_operator = None
+
+            column = query_words[i]
+            condition = query_words[i + 1]
+            value = query_words[i + 2]
+
+            if logical_operator:
+                conditions.append(logical_operator)
+
+            conditions.append((column, condition, value))
+
+            i += 3
+
+        # Chamar a função para atualizar os dados
+        _update_set(update_table, colunas, valores, conditions)
+
+        return "Dados atualizados!"
+
     elif "APAGAR" in query_words and "DE" in query_words:
         print("APAGAR DE tabela ONDE condicao")
     else:
         raise ValueError("Statement não reconhecida")
-    
+
     if "DE" in query_words:
         from_index = query_words.index("DE")
         table = query_words[from_index + 1]
@@ -235,7 +279,58 @@ def _insert_into(table, columns, values):
     except json.JSONDecodeError:
         print(f"Erro: Falha ao decodificar o JSON no arquivo '{table}'.")
 
-json_query = "INSERIR EM homes (Sell, List, Living, Rooms) VALORES (TESTE, TESTE, TESTE, TESTE)"
+def _update_set(table, columns, values, conditions):
+    try:
+        with open(os.path.join(data_directory, f"{table}.json"), 'r') as json_file:
+            table_data = json.load(json_file).get(table, [])
+
+            for row in table_data:
+                # Verificar se a linha atende às condições
+                if _check_conditions(row, conditions):
+                    # Atualizar os valores nas colunas correspondentes
+                    for col, val in zip(columns, values):
+                        row[col] = val
+
+            # Escrever os dados atualizados de volta ao arquivo JSON
+            with open(os.path.join(data_directory, f"{table}.json"), 'w') as json_file:
+                json.dump({table: table_data}, json_file, indent=2)
+
+    except FileNotFoundError:
+        print(f"Erro: O arquivo JSON '{table}' não foi encontrado.")
+    except json.JSONDecodeError:
+        print(f"Erro: Falha ao decodificar o JSON no arquivo '{table}'.")
+
+def _check_conditions(row, conditions):
+    for condition in conditions:
+        column = condition[0]
+        comparison_operator = condition[1]
+        value = condition[2]
+
+        # Verificar se as condições são atendidas
+        if not _compare_values(row[column], comparison_operator, value):
+            return False
+
+    return True
+
+def _compare_values(data_value, operator, condition_value):
+    # Comparar valores de acordo com o operador
+    if operator == '=':
+        return data_value == condition_value
+    elif operator == '<':
+        return data_value < condition_value
+    elif operator == '<=':
+        return data_value <= condition_value
+    elif operator == '>':
+        return data_value > condition_value
+    elif operator == '>=':
+        return data_value >= condition_value
+    else:
+        print(f"Erro: Operador de comparação '{operator}' não suportado.")
+        return False
+
+#json_query = "PEGAR Month, Average DE hurricanes ONDE Average >= 0.1 E Average < 2 ORDENE Average DECRESCENTE"
+#json_query = "INSERIR EM homes (Sell, List, Living, Rooms) VALORES (TESTE, TESTE, TESTE, TESTE)"
+json_query = "ATUALIZAR hurricanes DEFINIR Month = January, Average = 1.1 ONDE Average < 3.0"
 data = load_data()
 result = parse_query(json_query, data)
 print(result)
