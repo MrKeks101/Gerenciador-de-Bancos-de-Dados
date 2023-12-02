@@ -19,6 +19,29 @@ def load_data():
 
     return data
 
+def _join_tables(table1, table2, condition):
+    result = []
+    
+    for row1 in table1:
+        for row2 in table2:
+            if _check_join_condition(row1, row2, condition):
+                new_row = {**row1, **row2}  # Unir as colunas das duas tabelas
+
+                # tirar fora campos que nao existem nas tabelas
+                if any(value is None for value in new_row.values()):
+                    break
+
+                result.append(new_row)
+                
+    return result
+
+def _check_join_condition(row1, row2, condition):
+    col1, _, col2 = condition
+    col1 = col1.split('.')[-1]  # Extrai a segunda palavra após o ponto
+    col2 = col2.split('.')[-1]  # Extrai a segunda palavra após o ponto
+
+    return row1.get(col1) == row2.get(col2)
+
 # Parse and execute a query on the loaded data.
 def parse_query(query, data):
 
@@ -30,7 +53,7 @@ def parse_query(query, data):
         from_index = query_words.index("DE")
         
         if select_index < from_index - 1:
-            select_columns = [col for col in query_words[select_index + 1:from_index]]
+            select_columns = [col.split('.')[-1] for col in query_words[select_index + 1:from_index]]
         else:
             select_columns = ["*"]
             
@@ -146,6 +169,20 @@ def parse_query(query, data):
 
         query_result = _from(select_columns, table)
         from_data = query_result
+
+        if "JUNCAO" in query_words and "USANDO" in query_words:
+            join_index = query_words.index("JUNCAO")
+            on_index = query_words.index("USANDO")
+            join_table = query_words[join_index + 1]
+            join_condition = query_words[on_index + 1:on_index + 4]
+
+            join_table_data = _from(select_columns, join_table)
+
+            # Realizar a junção com a tabela especificada e a condição de junção
+            join_result = _join_tables(from_data, join_table_data, join_condition)
+            
+            # Atualizar o contexto da junção para ser utilizado como base na próxima parte do SELECT
+            from_data = join_result
     
     if "ONDE" in query_words:
         where_index = query_words.index("ONDE")
@@ -165,6 +202,9 @@ def parse_query(query, data):
 
             if logical_operator:
                 conditions.append(logical_operator)
+            
+            # limpa o tabela.coluna
+            column = column.split('.')[-1]
 
             conditions.append((column, condition, value))
 
@@ -378,7 +418,8 @@ def _delete_from(table, conditions):
 #json_query = "PEGAR Month, Average DE hurricanes ONDE Average >= 0.1 E Average < 2 ORDENE Average DECRESCENTE"
 #json_query = "INSERIR EM homes (Sell, List, Living, Rooms) VALORES (TESTE, TESTE, TESTE, TESTE)"
 #json_query = "ATUALIZAR hurricanes DEFINIR Month = January, Average = 1.1 ONDE Average > 3.0"
-json_query = "APAGAR DE hurricanes ONDE Month = March"
+#json_query = "APAGAR DE hurricanes ONDE Average = 0.0"
+json_query = "PEGAR hurricanes.Month, hurricanes.Average DE hurricanes JUNCAO hurricanes_test USANDO hurricanes.Month = hurricanes_test.Month ONDE hurricanes.Month = January OU hurricanes.Month = February"
 data = load_data()
 result = parse_query(json_query, data)
 print(result)
