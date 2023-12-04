@@ -4,11 +4,16 @@ from tkinter import messagebox
 import mysql.connector
 import json
 from datetime import date, datetime
+from decimal import Decimal
 
 class CustomJSONEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, (date, datetime)):
             return obj.isoformat()
+        elif isinstance(obj, set):
+            return list(obj)
+        elif isinstance(obj, Decimal):
+            return float(obj)
         return super().default(obj)
 
 def mysql_import(host, user, password, database, tables):
