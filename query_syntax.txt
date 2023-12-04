@@ -1,0 +1,53 @@
+# Sintaxe das consultas
+
+Projeção:
+    PEGAR coluna0, coluna1 DE tabela0
+    PEGAR * DE tabela0
+
+Filtros:
+    5 operações possíveis:
+    ONDE coluna0 = valor0
+    ONDE coluna0 > valor0
+    ONDE coluna0 >= valor0
+    ONDE coluna0 < valor0
+    ONDE coluna0 <= valor0
+
+    Modificadores lógicos (OU/E):
+    ONDE coluna0 = valor0 OU coluna1 = valor1
+    ONDE coluna0 = valor0 E coluna1 = valor1
+
+Ordenação:
+    ORDENE campo0 Crescente
+    ORDENE campo0 Decrescente
+
+Junção de tabelas:
+    JUNCAO tabela1 USANDO tabela0.campo0 = tabela1.campo1
+
+Inserção:
+    INSERIR EM tabela0 (campo0, campo1, campo2) VALORES (valor0, valor1, valor2)
+
+Atualização:
+    ATUALIZAR tabela0 DEFINIR campo0 = valor0, campo1 = valor1 ONDE campo0 = valor1
+
+Deleção:
+    APAGAR DE tabela0 ONDE campo0 = valor0
+
+Exemplos:
+    #   PEGAR Month, Average DE hurricanes ONDE Average >= 0.1 E Average < 4 ORDENE Average DECRESCENTE
+
+    #   INSERIR EM departments (dept_no, dept_name) VALORES (d010, 'Computer Science')
+
+    #   PEGAR actor.actor_id, actor.first_name, actor.last_name, film_actor.film_id, film.title, language.name, film_category.category_id 
+        DE actor 
+        JUNCAO film_actor USANDO actor.actor_id = film_actor.actor_id 
+        JUNCAO film USANDO film_actor.film_id = film.film_id 
+        JUNCAO film_category USANDO film.film_id = film_category.film_id 
+        ONDE actor.actor_id = 1
+    
+    #   PEGAR * DE departments ONDE dept_name = 'Computer Science' ORDENE dept_no CRESCENTE
+
+    #   APAGAR DE hurricanes ONDE Month = January E Average = 5.0
+
+    #   ATUALIZAR hurricanes DEFINIR Month = January, Average = 1.0 ONDE Month = December E Average = 0.0
+
+    #   APAGAR DE departments ONDE dept_name = 'Computer Science'
