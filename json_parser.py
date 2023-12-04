@@ -185,9 +185,11 @@ def parse_query(query, data):
         query_result = _from(select_columns, table)
         from_data = query_result
 
-        if "JUNCAO" in query_words and "USANDO" in query_words:
-            join_index = query_words.index("JUNCAO")
-            on_index = query_words.index("USANDO")
+        i = from_index + 2
+        while i < len(query_words) and query_words[i] == "JUNCAO" and "USANDO" in query_words[i:]:
+            # Encontrou outra junção
+            join_index = i
+            on_index = query_words.index("USANDO", join_index)
             join_table = query_words[join_index + 1]
             join_condition = query_words[on_index + 1:on_index + 4]
 
@@ -195,9 +197,12 @@ def parse_query(query, data):
 
             # Realizar a junção com a tabela especificada e a condição de junção
             join_result = _join_tables(from_data, join_table_data, join_condition)
-            
+
             # Atualizar o contexto da junção para ser utilizado como base na próxima parte do SELECT
             from_data = join_result
+
+            # Atualizar o índice para a próxima palavra após a condição de junção
+            i = on_index + 4
     
     if "ONDE" in query_words:
         where_index = query_words.index("ONDE")
@@ -430,16 +435,11 @@ def _delete_from(table, conditions):
     except json.JSONDecodeError:
         print(f"Erro: Falha ao decodificar o JSON no arquivo '{table}'.")
 
-#json_query = "PEGAR Month, Average DE hurricanes ONDE Average >= 0.1 E Average < 2 ORDENE Average DECRESCENTE"
-#json_query = "INSERIR EM homes (Sell, List, Living, Rooms) VALORES (TESTE, TESTE, TESTE, TESTE)"
+#json_query = "PEGAR Month, Average DE hurricanes ONDE Average >= 0.1 E Average < 4 ORDENE Average DECRESCENTE"
+#json_query = "INSERIR EM hurricanes (Month, Average) VALORES (January, 4.1)"
 #json_query = "ATUALIZAR hurricanes DEFINIR Month = January, Average = 1.1 ONDE Average > 3.0"
 #json_query = "APAGAR DE hurricanes ONDE Average = 0.0"
-json_query = """"
-                PEGAR actor.actor_id, actor.first_name, actor.last_name, film_actor.film_id 
-                DE actor 
-                JUNCAO film_actor USANDO actor.actor_id = film_actor.actor_id 
-                ONDE actor.actor_id = 4
-            """
+json_query = "PEGAR actor.actor_id, actor.first_name, actor.last_name, film_actor.film_id, film.title, language.name, film_category.category_id DE actor JUNCAO film_actor USANDO actor.actor_id = film_actor.actor_id JUNCAO film USANDO film_actor.film_id = film.film_id JUNCAO film_category USANDO film.film_id = film_category.film_id ONDE actor.actor_id = 1"
 data = load_data()
 result = parse_query(json_query, data)
 
