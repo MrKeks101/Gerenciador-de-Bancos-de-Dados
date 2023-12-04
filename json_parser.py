@@ -1,5 +1,6 @@
 import json
 import os
+import re
 
 # .json output data path
 data_directory = os.path.join(os.path.dirname(__file__), 'data')
@@ -60,8 +61,29 @@ def _check_join_condition(row1, row2, condition):
 # Parse and execute a query on the loaded data.
 def parse_query(query, data):
 
-    query_list = query.split(' ')
-    query_words = [element.replace(',', '') for element in query_list]
+    #query_list = query.split(' ')
+    #query_words = [element.replace(',', '') for element in query_list]
+
+    # lógica que garante que strings passadas como valor não sejam quebradas
+    query_words = []
+    current_word = ''
+
+    inside_quotes = False
+
+    for char in query:
+        if char == "'":
+            inside_quotes = not inside_quotes
+            #current_word += char
+        elif char == ' ' and not inside_quotes:
+            if current_word:
+                query_words.append(current_word.replace(',', ''))
+                current_word = ''
+        else:
+            current_word += char
+
+    # garante que última palavra seja adicionada
+    if current_word:
+        query_words.append(current_word.replace(',', ''))
 
     if "PEGAR" in query_words and "DE" in query_words:
         select_index = query_words.index("PEGAR")
@@ -90,10 +112,10 @@ def parse_query(query, data):
             values_clean = [s.replace('(', '').replace(')', '') for s in values]
 
             # insere
-            _insert_into(into_table, columns_clean, values_clean)
+            registro_inserido = _insert_into(into_table, columns_clean, values_clean)
 
             # retorna o registro inserido
-            return (columns_clean, values_clean)
+            return registro_inserido
         else:
             raise ValueError("Cláusula 'VALORES' não encontrada na instrução INSERIR.")
 
@@ -364,6 +386,9 @@ def _insert_into(table, columns, values):
             with open(os.path.join(data_directory, f"{table}.json"), 'w') as json_file:
                 json.dump({table: table_data}, json_file, indent=2)
 
+            # devolve o registro inserido
+            return new_record
+
     except FileNotFoundError:
         print(f"Erro: O arquivo JSON '{table}' não foi encontrado.")
     except json.JSONDecodeError:
@@ -450,18 +475,24 @@ def _delete_from(table, conditions):
     except json.JSONDecodeError:
         print(f"Erro: Falha ao decodificar o JSON no arquivo '{table}'.")
 
-json_query = "PEGAR Month, Average DE hurricanes ONDE Average >= 0.1 E Average < 4 ORDENE Average DECRESCENTE"
+#json_query = "PEGAR Month, Average DE hurricanes ONDE Average >= 0.1 E Average < 4 ORDENE Average DECRESCENTE"
 #json_query = "INSERIR EM hurricanes (Month, Average) VALORES (January, 4.1)"
 #json_query = "ATUALIZAR hurricanes DEFINIR Month = January, Average = 1.0 ONDE Month = December E Average = 0.0"
 #json_query = "APAGAR DE hurricanes ONDE Month = January E Average = 5.0"
 #json_query = "PEGAR actor.actor_id, actor.first_name, actor.last_name, film_actor.film_id, film.title, language.name, film_category.category_id DE actor JUNCAO film_actor USANDO actor.actor_id = film_actor.actor_id JUNCAO film USANDO film_actor.film_id = film.film_id JUNCAO film_category USANDO film.film_id = film_category.film_id ONDE actor.actor_id = 1"
+
+# employees table
+#json_query = "PEGAR emp_no, first_name, last_name DE employees"
+#json_query = "PEGAR * DE departments ONDE dept_name = 'Computer Science' ORDENE dept_no CRESCENTE"
+#json_query = "PEGAR emp_no, emp_first_name, dept_no, dept_name DE dept_manager JUNCAO departments USANDO dept_manager.dept_no = departments.dept_no JUNCAO employees USANDO employees.emp_no = dept_manager.emp_no ONDE to_date = 9999-01-01"
+json_query = "INSERIR EM departments (dept_no, dept_name) VALORES (d010, 'Computer Science')"
+#json_query = "APAGAR DE departments ONDE dept_name = 'Computer Science'"
+
 data = load_data()
 result = parse_query(json_query, data)
 
-if isinstance(result, str):
-    print(result)
-elif isinstance(result, list):
+if isinstance(result, list):
     for r in result:
         print(json.dumps(r, indent=2))
 else:
-    print("Tipo de resultado não reconhecido.")
+    print(result)
