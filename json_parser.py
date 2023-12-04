@@ -391,16 +391,31 @@ def _update_set(table, columns, values, conditions):
         print(f"Erro: Falha ao decodificar o JSON no arquivo '{table}'.")
 
 def _check_conditions(row, conditions):
+    # Variáveis para rastrear o estado da avaliação das condições
+    overall_result = False
+    current_logical_operator = None
+
     for condition in conditions:
-        column = condition[0]
-        comparison_operator = condition[1]
-        value = condition[2]
+        if isinstance(condition, tuple):
+            column = condition[0]
+            comparison_operator = condition[1]
+            value = condition[2]
 
-        # Verificar se as condições são atendidas
-        if not _compare_values(row[column], comparison_operator, value):
-            return False
+            # Avaliar a condição atual
+            condition_result = _compare_values(row[column], comparison_operator, value)
 
-    return True
+            # Atualizar o resultado geral com base no operador lógico anterior
+            if current_logical_operator is None:
+                overall_result = condition_result
+            elif current_logical_operator == "E":
+                overall_result = overall_result and condition_result
+            elif current_logical_operator == "OU":
+                overall_result = overall_result or condition_result
+        elif isinstance(condition, str):
+            # Atualizar o operador lógico atual
+            current_logical_operator = condition
+
+    return overall_result
 
 def _compare_values(data_value, operator, condition_value):
     # Comparar valores de acordo com o operador
@@ -435,13 +450,18 @@ def _delete_from(table, conditions):
     except json.JSONDecodeError:
         print(f"Erro: Falha ao decodificar o JSON no arquivo '{table}'.")
 
-#json_query = "PEGAR Month, Average DE hurricanes ONDE Average >= 0.1 E Average < 4 ORDENE Average DECRESCENTE"
+json_query = "PEGAR Month, Average DE hurricanes ONDE Average >= 0.1 E Average < 4 ORDENE Average DECRESCENTE"
 #json_query = "INSERIR EM hurricanes (Month, Average) VALORES (January, 4.1)"
-#json_query = "ATUALIZAR hurricanes DEFINIR Month = January, Average = 1.1 ONDE Average > 3.0"
-#json_query = "APAGAR DE hurricanes ONDE Average = 0.0"
-json_query = "PEGAR actor.actor_id, actor.first_name, actor.last_name, film_actor.film_id, film.title, language.name, film_category.category_id DE actor JUNCAO film_actor USANDO actor.actor_id = film_actor.actor_id JUNCAO film USANDO film_actor.film_id = film.film_id JUNCAO film_category USANDO film.film_id = film_category.film_id ONDE actor.actor_id = 1"
+#json_query = "ATUALIZAR hurricanes DEFINIR Month = January, Average = 1.0 ONDE Month = December E Average = 0.0"
+#json_query = "APAGAR DE hurricanes ONDE Month = January E Average = 5.0"
+#json_query = "PEGAR actor.actor_id, actor.first_name, actor.last_name, film_actor.film_id, film.title, language.name, film_category.category_id DE actor JUNCAO film_actor USANDO actor.actor_id = film_actor.actor_id JUNCAO film USANDO film_actor.film_id = film.film_id JUNCAO film_category USANDO film.film_id = film_category.film_id ONDE actor.actor_id = 1"
 data = load_data()
 result = parse_query(json_query, data)
 
-for r in result:
-    print(r)
+if isinstance(result, str):
+    print(result)
+elif isinstance(result, list):
+    for r in result:
+        print(json.dumps(r, indent=2))
+else:
+    print("Tipo de resultado não reconhecido.")
