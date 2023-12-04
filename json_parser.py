@@ -25,15 +25,30 @@ def _join_tables(table1, table2, condition):
     for row1 in table1:
         for row2 in table2:
             if _check_join_condition(row1, row2, condition):
-                new_row = {**row1, **row2}  # Unir as colunas das duas tabelas
+                # Criar uma cópia das linhas para evitar modificar as tabelas originais
+                new_row1 = row1.copy()
+                new_row2 = row2.copy()
+                
+                # Renomear colunas da segunda tabela para evitar duplicatas
+                for col in new_row2.copy():
+                    new_row2[f"{col}_right"] = new_row2.pop(col)
 
-                # tirar fora campos que nao existem nas tabelas
-                if any(value is None for value in new_row.values()):
-                    break
+                # Combinar as duas linhas
+                new_row = {**new_row1, **new_row2}
+
+                # Remover colunas com valor None
+                new_row = {key: value for key, value in new_row.items() if value is not None}
 
                 result.append(new_row)
-                
-    return result
+    
+    # Renomear colunas removendo "_right" do final antes de retornar o resultado
+    renamed_result = []
+    for row in result:
+        renamed_row = {key.rstrip('_right'): value for key, value in row.items()}
+        renamed_result.append(renamed_row)
+
+    return renamed_result
+
 
 def _check_join_condition(row1, row2, condition):
     col1, _, col2 = condition
@@ -419,7 +434,14 @@ def _delete_from(table, conditions):
 #json_query = "INSERIR EM homes (Sell, List, Living, Rooms) VALORES (TESTE, TESTE, TESTE, TESTE)"
 #json_query = "ATUALIZAR hurricanes DEFINIR Month = January, Average = 1.1 ONDE Average > 3.0"
 #json_query = "APAGAR DE hurricanes ONDE Average = 0.0"
-json_query = "PEGAR hurricanes.Month, hurricanes.Average DE hurricanes JUNCAO hurricanes_test USANDO hurricanes.Month = hurricanes_test.Month ONDE hurricanes.Month = January OU hurricanes.Month = February"
+json_query = """"
+                PEGAR actor.actor_id, actor.first_name, actor.last_name, film_actor.film_id 
+                DE actor 
+                JUNCAO film_actor USANDO actor.actor_id = film_actor.actor_id 
+                ONDE actor.actor_id = 4
+            """
 data = load_data()
 result = parse_query(json_query, data)
-print(result)
+
+for r in result:
+    print(r)
